@@ -2,10 +2,10 @@
 安装依赖环境：pip install "pettingzoo[mpe]"
 """
 
-from pettingzoo.mpe import simple_spread_v2
+from pettingzoo.mpe import simple_spread_v3
 import time
 
-env = simple_spread_v2.env(N=2, local_ratio=0.5, max_cycles=25, continuous_actions=False, render_mode="human")
+env = simple_spread_v3.env(N=2, local_ratio=0.5, max_cycles=25, continuous_actions=False, render_mode="human")
 
 num_agents = len(env.possible_agents)
 num_actions = env.action_space(env.possible_agents[0]).n

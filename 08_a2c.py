@@ -144,7 +144,7 @@ def train(args, env, agent: A2C):
     info = INFO()
 
     rollout = Rollout()
-    state, _ = env.reset()
+    state = env.reset()
     for step in range(args.max_steps):
         action, logp_action = agent.get_action(torch.tensor(state).float())
         next_state, reward, terminated, truncated, _ = env.step(action.item())
@@ -187,7 +187,7 @@ def train(args, env, agent: A2C):
             print(f"step={step}, reward={episode_reward:.0f}, length={episode_length}, max_reward={info.max_episode_reward}, value_loss={value_loss:.1e}")
 
             # 重置环境。
-            state, _ = env.reset()
+            state = env.reset()
             rollout = Rollout()
 
             # 保存模型。
@@ -213,7 +213,7 @@ def eval(args, env, agent):
 
     episode_length = 0
     episode_reward = 0
-    state, _ = env.reset()
+    state = env.reset()
     for i in range(5000):
         episode_length += 1
         action, _ = agent.get_action(torch.from_numpy(state))
@@ -224,7 +224,7 @@ def eval(args, env, agent):
         state = next_state
         if done is True:
             print(f"episode reward={episode_reward}, length={episode_length}")
-            state, _ = env.reset()
+            state = env.reset()
             episode_length = 0
             episode_reward = 0
 
@@ -247,7 +247,7 @@ if __name__ == "__main__":
     parser.add_argument("--do_eval", action="store_true", help="Evaluate policy.")
     args = parser.parse_args()
 
-    env = gym.make(args.env)
+    env = gym.make(args.env, new_step_api=True)
     agent = A2C(args)
 
     if args.do_train:

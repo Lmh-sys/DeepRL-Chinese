@@ -1,4 +1,4 @@
-"""8.3节带基线的REINFORCE算法实现。"""
+"""8.2节带基线的REINFORCE算法实现。"""
 import argparse
 import os
 from collections import defaultdict
@@ -151,7 +151,7 @@ def train(args, env, agent: REINFORCE_with_Baseline):
     info = INFO()
 
     rollout = Rollout()
-    state, _ = env.reset()
+    state = env.reset()
     for step in range(args.max_steps):
         action, logp_action = agent.get_action(torch.tensor(state).float())
         next_state, reward, terminated, truncated, _ = env.step(action.item())
@@ -194,7 +194,7 @@ def train(args, env, agent: REINFORCE_with_Baseline):
             print(f"step={step}, reward={episode_reward:.0f}, length={episode_length}, max_reward={info.max_episode_reward}, value_loss={value_loss:.1e}")
 
             # 重置环境。
-            state, _ = env.reset()
+            state = env.reset()
             rollout = Rollout()
 
             # 保存模型。
@@ -220,7 +220,7 @@ def eval(args, env, agent):
 
     episode_length = 0
     episode_reward = 0
-    state, _ = env.reset()
+    state = env.reset()
     for i in range(5000):
         episode_length += 1
         action, _ = agent.get_action(torch.from_numpy(state))
@@ -231,7 +231,7 @@ def eval(args, env, agent):
         state = next_state
         if done is True:
             print(f"episode reward={episode_reward}, episode length={episode_length}")
-            state, _ = env.reset()
+            state = env.reset()
             episode_length = 0
             episode_reward = 0
 
@@ -254,7 +254,9 @@ if __name__ == "__main__":
     parser.add_argument("--do_eval", action="store_true", help="Evaluate policy.")
     args = parser.parse_args()
 
-    env = gym.make(args.env)
+    # args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+
+    env = gym.make(args.env, new_step_api=True)
     agent = REINFORCE_with_Baseline(args)
 
     if args.do_train:

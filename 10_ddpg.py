@@ -189,7 +189,7 @@ def train(args, env, agent: DDPG):
     value_loss_list = [0]
     policy_loss_list = [0]
 
-    state, _ = env.reset()
+    state = env.reset()
     for i in range(args.max_steps):
 
         action = agent.get_action(torch.tensor(state))
@@ -215,7 +215,7 @@ def train(args, env, agent: DDPG):
 
             log["episode_reward"].append(episode_reward)
 
-            state, _ = env.reset()
+            state = env.reset()
             episode_reward = 0
             episode_length = 0
             value_loss_list = [0]
@@ -263,7 +263,7 @@ def eval(args, agent: DDPG):
     episode_reward = 0
 
     env = gym.make(args.env, render_mode="human")
-    state, _ = env.reset()
+    state = env.reset()
     for i in range(1000):
 
         action = agent.get_action(torch.tensor(state))
@@ -275,7 +275,7 @@ def eval(args, agent: DDPG):
 
         if done:
             print(f"episode reward={episode_reward}")
-            state, _ = env.reset()
+            state = env.reset()
             episode_reward = 0
 
 
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
 
-    env = gym.make(args.env)
+    env = gym.make(args.env, new_step_api=True)
     agent = DDPG(env.observation_space.shape[0], env.action_space.shape[0], args.gamma)
 
     if args.do_train:

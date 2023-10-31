@@ -39,9 +39,9 @@ class SARSA:
 
     def compute_loss(self, args, s_list, a_list, r_list):
         batch_s = np.array(s_list)
-        batch_s = torch.tensor(batch_s, dtype=torch.float32)
+        batch_s = torch.tensor(batch_s, dtype=torch.float32).to(args.device)
         batch_a = np.array(a_list)
-        batch_a = torch.tensor(batch_a, dtype=torch.long)
+        batch_a = torch.tensor(batch_a, dtype=torch.long).to(args.device)
 
         # 2. 对于所有的t=1，...，n-m，计算$\hat{q}_t = q(s_t, a_t; w_{now}$。
         num = len(r_list)
@@ -66,7 +66,7 @@ class SARSA:
             R = args.gamma * R + r_list[i]
             rewards.append(R)
         rewards.reverse()
-        rewards = torch.tensor(rewards, dtype=torch.float32)
+        rewards = torch.tensor(rewards, dtype=torch.float32).to('cuda')
 
         with torch.no_grad():
             state = batch_s[args.m :, :]
@@ -74,7 +74,7 @@ class SARSA:
             m_step_qvals = self.target_Q(state).gather(1, action.unsqueeze(1)).squeeze()
 
             target_values = args.gamma**args.m * m_step_qvals
-            target_values = torch.cat([target_values, torch.tensor([0.0])])
+            target_values = torch.cat([target_values, torch.tensor([0.0]).to(args.device)])
             target_values = target_values + rewards
 
         td_delta = qvals - target_values
@@ -110,12 +110,12 @@ def train(args, env, agent):
     a_list = []
     r_list = []
 
-    state, _ = env.reset(seed=args.seed)
+    state = env.reset(seed=args.seed)
     for step in range(args.max_steps):
         if np.random.rand() < epsilon:
             action = env.action_space.sample()
         else:
-            action = agent.get_action(torch.from_numpy(state))
+            action = agent.get_action(torch.from_numpy(state).to(args.device))
             action = action.item()
         next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
@@ -155,7 +155,7 @@ def train(args, env, agent):
             epsilon = max(epsilon - (epsilon_max - epsilon_min) * args.epsilon_decay, 1e-1)
             episode_reward = 0
             episode_length = 0
-            state, _ = env.reset()
+            state = env.reset()
 
     # 3. 画图。
     plt.plot(log["loss"])
@@ -213,10 +213,11 @@ def main():
 
     args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
-    env = gym.make(args.env)
+    env = gym.make(args.env,render_mode="human", new_step_api=True)
     set_seed(args)
     agent = SARSA(dim_state=args.dim_state, num_action=args.num_action, gamma=args.gamma)
     agent.Q.to(args.device)
+    agent.target_Q.to(args.device)
 
     if args.do_train:
         train(args, env, agent)

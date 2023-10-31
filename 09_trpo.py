@@ -28,6 +28,11 @@ class CategoricalLayer(nn.Module):
         super().__init__()
 
     def __call__(self, log_action_probs):
+          # 检查是否存在NaN值
+        if torch.isnan(log_action_probs).any():
+            # 处理NaN值的方法，例如进行填充或重新计算
+            log_action_probs = torch.nan_to_num(log_action_probs, nan=0.0)
+        
         return Categorical(logits=log_action_probs)
 
 
@@ -100,7 +105,7 @@ class TRPO:
             cumsum_rewards.append(cumsum_current)
         cumsum_rewards.pop(0)
         cumsum_rewards = list(reversed(cumsum_rewards))
-        cumsum_rewards = torch.tensor(cumsum_rewards, dtype=torch.float32)
+        cumsum_rewards = torch.tensor(cumsum_rewards, dtype=torch.float32).to("cuda")
 
         action_dists = self.policy_net(s_batch)
         log_action_probs = action_dists.log_prob(a_batch)
@@ -151,7 +156,7 @@ class TRPO:
             cumsum_rewards.append(cumsum_current)
         cumsum_rewards.pop(0)
         cumsum_rewards = list(reversed(cumsum_rewards))
-        cumsum_rewards = torch.tensor(cumsum_rewards, dtype=torch.float32)
+        cumsum_rewards = torch.tensor(cumsum_rewards, dtype=torch.float32).to("cuda")
 
         for i in range(args.num_update_value):
 
@@ -377,7 +382,7 @@ def train(args, env, agent):
     agent.value_net.zero_grad()
     state = env.reset()
     for i in range(args.max_steps):
-        action = agent.get_action(torch.from_numpy(state)).item()
+        action = agent.get_action(torch.from_numpy(state).to(args.device)).item()
         next_state, reward, done, info = env.step(action)
         episode_reward += reward
         episode_length += 1
@@ -400,11 +405,11 @@ def train(args, env, agent):
             state = env.reset()
 
             # Update policy and value nets.
-            s_batch = torch.tensor(trajectory.state, dtype=torch.float32)
-            a_batch = torch.tensor(trajectory.action, dtype=torch.int64)
-            r_batch = torch.tensor(trajectory.reward, dtype=torch.float32)
-            d_batch = torch.tensor(trajectory.done, dtype=torch.float32)
-            ns_batch = torch.tensor(trajectory.next_state, dtype=torch.float32)
+            s_batch = torch.tensor(trajectory.state, dtype=torch.float32).to(args.device)
+            a_batch = torch.tensor(trajectory.action, dtype=torch.int64).to(args.device)
+            r_batch = torch.tensor(trajectory.reward, dtype=torch.float32).to(args.device)
+            d_batch = torch.tensor(trajectory.done, dtype=torch.float32).to(args.device)
+            ns_batch = torch.tensor(trajectory.next_state, dtype=torch.float32).to(args.device)
 
             agent.update_policy_net(s_batch, a_batch, r_batch, d_batch, ns_batch)
             agent.update_value_net(args, s_batch, r_batch, d_batch)
@@ -419,14 +424,14 @@ def train(args, env, agent):
 
 def eval(args, env, agent):
     model_path = os.path.join(args.output_dir, "model.bin")
-    agent.model.load_state_dict(torch.load(model_path))
+    agent.policy_net.load_state_dict(torch.load(model_path))
 
     episode_length = 0
     episode_reward = 0
     state = env.reset()
     for i in range(5000):
         episode_length += 1
-        action = agent.get_action(torch.from_numpy(state)).item()
+        action = agent.get_action(torch.from_numpy(state).to(args.device)).item()
         next_state, reward, done, info = env.step(action)
         env.render()
         episode_reward += reward
@@ -455,6 +460,7 @@ def main():
     parser.add_argument("--do_eval", action="store_true", help="Evaluate policy.")
     args = parser.parse_args()
 
+    # args.device = "cpu"
     args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
     env = gym.make(args.env)

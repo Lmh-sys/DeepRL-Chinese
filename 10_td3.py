@@ -178,7 +178,7 @@ def train(args, env, agent: TD3):
     replay_buffer = ReplayBuffer(maxsize=100_000)
     info = INFO()
 
-    state, _ = env.reset(seed=args.seed)
+    state = env.reset(seed=args.seed)
     for step in range(args.max_steps):
         if step < args.warmup_steps:
             action = env.action_space.sample()
@@ -206,7 +206,7 @@ def train(args, env, agent: TD3):
                 save_path = os.path.join(args.output_dir, "model.bin")
                 torch.save(agent.Mu.state_dict(), save_path)
 
-            state, _ = env.reset()
+            state = env.reset()
 
         if step > args.warmup_steps:
             s_batch, a_batch, r_batch, d_batch, ns_batch = replay_buffer.sample(n=args.batch_size)
@@ -265,7 +265,7 @@ def eval(args, env, agent):
 
     episode_length = 0
     episode_reward = 0
-    state, _ = env.reset()
+    state = env.reset()
     for i in range(5000):
         episode_length += 1
         action = agent.get_action(torch.from_numpy(state)).cpu().data.numpy()
@@ -277,7 +277,7 @@ def eval(args, env, agent):
         state = next_state
         if done is True:
             print(f"episode reward={episode_reward}, length={episode_length}")
-            state, _ = env.reset()
+            state = env.reset()
             episode_length = 0
             episode_reward = 0
 
@@ -308,7 +308,7 @@ def main():
     args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
     # 初始化环境。
-    env = gym.make(args.env)
+    env = gym.make(args.env, new_step_api=True)
 
     agent = TD3(dim_state=args.dim_state, dim_action=args.dim_action, max_action=args.max_action)
 

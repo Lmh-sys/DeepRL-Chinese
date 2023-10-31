@@ -111,7 +111,7 @@ def train(args, env, agent):
     log["loss"].append(0)
 
     agent.Q.train()
-    state, _ = env.reset(seed=args.seed)
+    state = env.reset(seed=args.seed)
     for i in range(args.max_steps):
         if np.random.rand() < epsilon or i < args.warmup_steps:
             action = env.action_space.sample()
@@ -141,7 +141,7 @@ def train(args, env, agent):
             episode_reward = 0
             episode_length = 0
             epsilon = max(epsilon - (epsilon_max - epsilon_min) * args.epsilon_decay, 1e-1)
-            state, _ = env.reset()
+            state = env.reset()
 
         if i > args.warmup_steps:
             bs, ba, br, bd, bns = replay_buffer.sample(n=args.batch_size)
@@ -176,7 +176,7 @@ def eval(args, env, agent):
 
     episode_length = 0
     episode_reward = 0
-    state, _ = env.reset()
+    state = env.reset()
     for i in range(5000):
         episode_length += 1
         action = agent.get_action(torch.from_numpy(state).to(args.device)).item()
@@ -188,7 +188,7 @@ def eval(args, env, agent):
         state = next_state
         if done is True:
             print(f"episode reward={episode_reward}, episode length{episode_length}")
-            state, _ = env.reset()
+            state = env.reset()
             episode_length = 0
             episode_reward = 0
 
@@ -207,13 +207,13 @@ def main():
     parser.add_argument("--warmup_steps", default=10_000, type=int, help="Warmup steps without training.")
     parser.add_argument("--output_dir", default="output", type=str, help="Output directory.")
     parser.add_argument("--epsilon_decay", default=1 / 1000, type=float, help="Epsilon-greedy algorithm decay coefficient.")
-    parser.add_argument("--do_train", action="store_true", help="Train policy.")
+    parser.add_argument("--do_train", default=True, action="store_true", help="Train policy.")
     parser.add_argument("--do_eval", action="store_true", help="Evaluate policy.")
     args = parser.parse_args()
 
     args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
-    env = gym.make(args.env)
+    env = gym.make(args.env, new_step_api=True)
     set_seed(args)
     agent = DQN(dim_state=args.dim_state, num_action=args.num_action, discount=args.discount)
     agent.Q.to(args.device)

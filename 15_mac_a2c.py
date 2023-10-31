@@ -7,7 +7,7 @@ from torch.optim import Adam
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from pettingzoo.mpe import simple_spread_v2
+from pettingzoo.mpe import simple_spread_v3
 import time
 from collections import defaultdict
 import os
@@ -125,7 +125,8 @@ class MAC(nn.Module):
 
 
 class Rollout:
-    def __init__(self):
+    def __init__(self,args):
+        self.args = args
         self.state_list = []
         self.reward_list = []
         self.done_list = []
@@ -141,11 +142,11 @@ class Rollout:
             self.logp_actions_dict[k].append(v)
 
     def tensor(self):
-        bs = torch.tensor(np.asarray(self.state_list)).float()
-        br = torch.tensor(np.asarray(self.reward_list)).float()
-        bd = torch.tensor(np.asarray(self.done_list)).float()
-        bns = torch.tensor(np.asarray(self.next_state_list)).float()
-        blogp_action_dict = {k: torch.stack(v) for k, v in self.logp_actions_dict.items()}
+        bs = torch.tensor(np.asarray(self.state_list)).float().to(self.args.device)
+        br = torch.tensor(np.asarray(self.reward_list)).float().to(self.args.device)
+        bd = torch.tensor(np.asarray(self.done_list)).float().to(self.args.device)
+        bns = torch.tensor(np.asarray(self.next_state_list)).float().to(self.args.device)
+        blogp_action_dict = {k: torch.stack(v).to(self.args.device) for k, v in self.logp_actions_dict.items()}
         return bs, br, bd, bns, blogp_action_dict
 
 
@@ -167,10 +168,10 @@ def train(args, env, central_controller: MAC):
         state = np.concatenate(state)
         logp_action_dict = {}
         episode_reward = 0
-        rollout = Rollout()
+        rollout = Rollout(args)
 
         for i, agent in enumerate(env.agent_iter()):
-            action, logp_action = central_controller.policy(torch.as_tensor(state).float(), agent)
+            action, logp_action = central_controller.policy(torch.as_tensor(state).float().to(args.device), agent)
             logp_action_dict[agent] = logp_action
             env.step(action)
 
@@ -234,7 +235,7 @@ def train(args, env, central_controller: MAC):
 
 
 def eval(args):
-    env = simple_spread_v2.env(N=args.num_agents, local_ratio=0.5, max_cycles=25, continuous_actions=False, render_mode="human")
+    env = simple_spread_v3.env(N=args.num_agents, local_ratio=0.5, max_cycles=25, continuous_actions=False, render_mode="human")
     central_controller = MAC(num_agents=args.num_agents, num_states=args.num_states, num_actions=args.num_actions)
 
     agent2policynet = torch.load(os.path.join(args.output_dir, "model.pt"))
@@ -275,8 +276,8 @@ def eval(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="合作型游戏。")
-    parser.add_argument("--num_agents", default=2, type=int)
-    parser.add_argument("--num_states", default=24, type=int)
+    parser.add_argument("--num_agents", default=3, type=int)
+    parser.add_argument("--num_states", default=54, type=int)
     parser.add_argument("--num_actions", default=5, type=int)
     parser.add_argument("--num_episode", default=20000, type=int)
     parser.add_argument("--lr_policy", default=1e-3, type=float)  # 1e-3
@@ -286,12 +287,18 @@ if __name__ == "__main__":
     parser.add_argument("--do_eval", action="store_true")
     args = parser.parse_args()
 
+    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     torch.manual_seed(0)
     np.random.seed(0)
 
-    env = simple_spread_v2.env(N=args.num_agents, local_ratio=0.5, max_cycles=25, continuous_actions=False)
+    env = simple_spread_v3.env(N=args.num_agents, local_ratio=0.5, max_cycles=25, continuous_actions=False)
     central_controller = MAC(num_agents=args.num_agents, num_states=args.num_states, num_actions=args.num_actions)
-
+    for i in range(args.num_agents):
+        central_controller.agent2policy[f"agent_{i}"].to(args.device)
+    central_controller.value_net.to(args.device)
+    central_controller.target_value_net.to(args.device)
+    
     num_agents = len(env.possible_agents)
     num_actions = env.action_space(env.possible_agents[0]).n
     observation_size = env.observation_space(env.possible_agents[0]).shape

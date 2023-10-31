@@ -50,7 +50,7 @@ class A3C(nn.Module):
         self.V_target = ValueNet(args.dim_state)
         self.pi = PolicyNet(args.dim_state, args.num_action)
         self.V_target.load_state_dict(self.V.state_dict())
-        self.env = gym.make(args.env)
+        self.env = gym.make(args.env, new_step_api=True)
 
         self.ep_reward = 0
 
@@ -254,7 +254,7 @@ def train(args):
 
 
 def eval(args):
-    env = gym.make(args.env)
+    env = gym.make(args.env, new_step_api=True)
     agent = Master(args)
     model_path = os.path.join(args.output_dir, "model.bin")
     agent.pi.load_state_dict(torch.load(model_path))

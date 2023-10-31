@@ -113,7 +113,7 @@ def train(args, env, agent):
     agent.target_Q.train()
     agent.Q.zero_grad()
     agent.target_Q.zero_grad()
-    state, _ = env.reset()
+    state = env.reset()
     for i in range(args.max_steps):
         if np.random.rand() < epsilon or i < args.warmup_steps:
             action = env.action_space.sample()
@@ -142,21 +142,21 @@ def train(args, env, agent):
             print(f"i={i}, reward={episode_reward:.0f}, length={episode_length}, max_reward={max_episode_reward}, loss={log_losses[-1]:.1e}, epsilon={epsilon:.3f}")
 
             if episode_length < 180 and episode_reward > max_episode_reward:
-                save_path = os.path.join(args.output_dir, "Q.bin")
+                save_path = os.path.join(args.output_dir, "model.bin")
                 torch.save(agent.Q.state_dict(), save_path)
                 max_episode_reward = episode_reward
 
             episode_reward = 0
             episode_length = 0
-            state, _ = env.reset()
+            state = env.reset()
 
         if i > args.warmup_steps:
             bs, ba, br, bd, bns = replay_buffer.sample(n=args.batch_size)
-            bs = torch.tensor(bs, dtype=torch.float32).to(args.device)
-            ba = torch.tensor(ba, dtype=torch.long).to(args.device)
-            br = torch.tensor(br, dtype=torch.float32).to(args.device)
-            bd = torch.tensor(bd, dtype=torch.float32).to(args.device)
-            bns = torch.tensor(bns, dtype=torch.float32).to(args.device)
+            bs = torch.tensor(np.array(bs), dtype=torch.float32).to(args.device)
+            ba = torch.tensor(np.array(ba), dtype=torch.long).to(args.device)
+            br = torch.tensor(np.array(br), dtype=torch.float32).to(args.device)
+            bd = torch.tensor(np.array(bd), dtype=torch.float32).to(args.device)
+            bns = torch.tensor(np.array(bns), dtype=torch.float32).to(args.device)
 
             loss = agent.compute_loss(bs, ba, br, bd, bns)
             loss.backward()
@@ -187,7 +187,7 @@ def eval(args, env, agent):
     episode_reward = 0
 
     agent.Q.eval()
-    state, _ = env.reset()
+    state = env.reset()
     for i in range(5000):
         episode_length += 1
         action = agent.get_action(torch.from_numpy(state).to(args.device)).item()
@@ -198,7 +198,7 @@ def eval(args, env, agent):
         state = next_state
         if done is True:
             print(f"episode reward={episode_reward}, episode length={episode_length}")
-            state, _ = env.reset()
+            state = env.reset()
             episode_length = 0
             episode_reward = 0
 
@@ -223,8 +223,8 @@ def main():
     args = parser.parse_args()
 
     args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
-
-    env = gym.make(args.env)
+    # render_mode="human"
+    env = gym.make(args.env, new_step_api=True)
     set_seed(args)
     agent = DoubleDQN(dim_obs=args.dim_obs, num_act=args.num_act, discount=args.discount)
     agent.Q.to(args.device)

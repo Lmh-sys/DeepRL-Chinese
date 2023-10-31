@@ -60,7 +60,7 @@ def train(args, env, agent: SARSA):
     episode_length = 0
     log = defaultdict(list)
 
-    state, _ = env.reset(seed=args.seed)
+    state = env.reset(seed=args.seed)
     for step in range(args.max_steps):
         if np.random.rand() < epsilon:
             action = env.action_space.sample()
@@ -99,7 +99,7 @@ def train(args, env, agent: SARSA):
             # epsilon = max(epsilon - (epsilon_max - epsilon_min) * args.epsilon_decay, 1e-1)
             episode_reward = 0
             episode_length = 0
-            state, _ = env.reset()
+            state = env.reset()
 
     # 3. 画图。
     os.makedirs(args.output_dir, exist_ok=True)
@@ -123,7 +123,7 @@ def main():
 
     args = parser.parse_args()
 
-    env = gym.make(args.env)
+    env = gym.make(args.env, render_mode="rgb_array", new_step_api=True)
     set_seed(args)
 
     # 角度是这个问题的主要特征。为了减少搜索空间，这里只分析角度。
